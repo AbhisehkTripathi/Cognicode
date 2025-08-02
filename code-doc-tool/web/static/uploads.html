@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Documentation Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .upload-area { border: 2px dashed #ccc; padding: 40px; text-align: center; margin: 20px 0; }
+        .upload-area.dragover { border-color: #007bff; background-color: #f8f9fa; }
+        .btn { background-color: #007bff; color: white; padding: 10px 20px; border: none; cursor: pointer; }
+        .btn:hover { background-color: #0056b3; }
+        .status { margin: 20px 0; padding: 10px; border-radius: 5px; }
+        .status.processing { background-color: #fff3cd; border: 1px solid #ffeaa7; }
+        .status.completed { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .status.error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <h1>Code Documentation Generator</h1>
+    <p>Upload your codebase (Laravel, Python, Node.js, React, etc.) and get automatically generated documentation.</p>
+    
+    <div class="upload-area" id="uploadArea">
+        <p>Drag and drop your code archive here, or click to select</p>
+        <input type="file" id="fileInput" accept=".zip,.tar,.tar.gz" style="display: none;">
+        <button class="btn" onclick="document.getElementById('fileInput').click()">Select File</button>
+    </div>
+    
+    <div id="status" style="display: none;"></div>
+    
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const statusDiv = document.getElementById('status');
+        
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                uploadFile(e.target.files[0]);
+            }
+        });
+        
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('codebase', file);
+            
+            showStatus('Uploading file...', 'processing');
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(result.message, 'processing');
+                    pollStatus(result.job_id);
+                } else {
+                    showStatus(result.error || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                showStatus('Upload failed: ' + error.message, 'error');
+            }
+        }
+        
+        async function pollStatus(jobId) {
+            try {
+                const response = await fetch(`/api/status/${jobId}`);
+                const result = await response.json();
+                
+                if (result.status === 'completed') {
+                    showStatus(
+                        `${result.message} <a href="${result.download_url}" class="btn">Download Documentation</a>`, 
+                        'completed'
+                    );
+                } else if (result.status === 'processing') {
+                    showStatus(result.message, 'processing');
+                    setTimeout(() => pollStatus(jobId), 3000); // Poll every 3 seconds
+                } else {
+                    showStatus(result.error || 'Processing failed', 'error');
+                }
+            } catch (error) {
+                showStatus('Status check failed: ' + error.message, 'error');
+            }
+        }
+        
+        function showStatus(message, type) {
+            statusDiv.innerHTML = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Air configuration for Go project with cmd/main.go as entrypoint
+[build]
+  cmd = "go build -o ./tmp/main ./cmd/main.go"
+  bin = "tmp/main"
+  full_bin = "false"
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  exclude_dir = ["tmp", "output", "uploads", "web/static", "pkg"]
+
+[log]
+  time = true
+
+[color]
+  main = "yellow"
+  watcher = "cyan"
+  build = "green"
+  runner = "magenta"

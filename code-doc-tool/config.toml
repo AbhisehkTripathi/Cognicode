@@ -1,0 +1,25 @@
+[ai]
+# AI model configuration
+model = "gpt-4"
+max_tokens = 4096
+temperature = 0.7
+
+# API Configuration
+api_key = ""  # Will be loaded from environment variable AI_API_KEY
+base_url = "https://api.openai.com/v1"
+
+# Documentation generation settings
+default_language = "en"
+documentation_style = "professional"
+include_code_examples = true
+max_code_examples = 5
+
+[server]
+port = "3000"
+environment = "development"
+log_level = "info"
+
+[paths]
+upload_dir = "./uploads"
+output_dir = "./output"
+template_dir = "./templates"
