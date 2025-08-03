@@ -14,17 +14,14 @@ import (
 )
 
 func main() {
-	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
 
-	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		BodyLimit: 100 * 1024 * 1024, // 100MB
 	})
 
-	// Middleware
 	app.Use(logger.New())
 	app.Use(recover.New())
 	app.Use(cors.New(cors.Config{
@@ -32,13 +29,11 @@ func main() {
 		AllowMethods: "GET,POST,HEAD,OPTIONS",
 		AllowHeaders: "Origin, Content-Type, Accept",
 	}))
-	// Static files
+
 	app.Static("/", "./web/static")
 
-	// Routes
 	setupRoutes(app)
 
-	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
@@ -51,7 +46,6 @@ func main() {
 func setupRoutes(app *fiber.App) {
 	api := app.Group("/api")
 
-	// Upload endpoints
 	api.Post("/upload", handlers.UploadCodebase)
 	api.Get("/download/:filename", handlers.DownloadDocumentation)
 	api.Get("/status/:jobId", handlers.GetStatus)

@@ -28,7 +28,6 @@ func UploadCodebase(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate file type (zip, tar, tar.gz)
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	if !isValidArchive(ext) {
 		return c.Status(400).JSON(fiber.Map{
@@ -36,10 +35,8 @@ func UploadCodebase(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generate unique job ID
 	jobID := uuid.New().String()
 
-	// Create upload directory
 	uploadPath := fmt.Sprintf("./uploads/%s", jobID)
 	if err := utils.CreateDir(uploadPath); err != nil {
 		return c.Status(500).JSON(fiber.Map{
@@ -68,7 +65,6 @@ func UploadCodebase(c *fiber.Ctx) error {
 func processCodebase(jobID, filePath, filename string) {
 	log.Printf("Starting processing for job %s", jobID)
 
-	// Extract archive
 	extractPath := fmt.Sprintf("./uploads/%s/extracted", jobID)
 	if err := utils.ExtractArchive(filePath, extractPath); err != nil {
 		log.Printf("Failed to extract archive for job %s: %v", jobID, err)

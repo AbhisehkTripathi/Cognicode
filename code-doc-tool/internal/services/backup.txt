@@ -1,0 +1,1737 @@
+package services
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+
+	"code-doc-tool/internal/models"
+)
+
+type FileAnalyzer struct{}
+
+func NewFileAnalyzer() *FileAnalyzer {
+	return &FileAnalyzer{}
+}
+
+func (fa *FileAnalyzer) AnalyzeProject(projectPath string) (*models.Project, error) {
+	project := &models.Project{
+		Name:         filepath.Base(projectPath),
+		Path:         projectPath,
+		Dependencies: make(map[string][]models.Dependency),
+		Files:        []models.FileInfo{},
+		Structure:    []models.DirectoryNode{},
+	}
+
+	// Detect project type first
+	project.Type = fa.detectProjectType(projectPath)
+
+	// Set dynamic overview based on detected project type
+	project.Overview = fa.generateOverview(project.Name, project.Type, projectPath)
+
+	// Analyze and set tech stack dynamically
+	project.TechStack = fa.analyzeTechStack(projectPath, project.Type)
+
+	// Set architecture based on project type
+	project.Architecture = fa.generateArchitecture(project.Type)
+
+	// Analyze actual folder structure
+	project.FolderStructure = fa.analyzeFolderStructure(projectPath)
+
+	// Generate setup instructions based on project type
+	project.SetupInstructions = fa.generateSetupInstructions(project.Type, project.Name)
+
+	// Set API endpoints (if it's a web project)
+	project.APIEndpoints = fa.detectAPIEndpoints(projectPath, project.Type)
+
+	// Set parser info based on detected languages
+	project.ParsersInfo = fa.generateParsersInfo(project.Type)
+
+	// Generate data flow based on project structure
+	project.DataFlow = fa.generateDataFlow(project.Type)
+
+	// Detect external services from config files
+	project.ExternalServices = fa.detectExternalServices(projectPath)
+
+	// Generate deployment info based on project type
+	project.DeploymentInfo = fa.generateDeploymentInfo(projectPath, project.Type)
+
+	// Set future roadmap based on project analysis
+	project.FutureRoadmap = fa.generateFutureRoadmap(project.Type)
+
+	// Generate common issues based on project type
+	project.CommonIssues = fa.generateCommonIssues(project.Type)
+
+	// Generate developer notes
+	project.DeveloperNotes = fa.generateDeveloperNotes(projectPath, project.Type)
+
+	// Parse dependencies
+	if err := fa.parseDependencies(projectPath, project); err != nil {
+		return nil, err
+	}
+
+	// Build directory structure
+	if err := fa.buildDirectoryStructure(projectPath, project); err != nil {
+		return nil, err
+	}
+
+	// Analyze files
+	if err := fa.analyzeFiles(projectPath, project); err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
+func (fa *FileAnalyzer) generateOverview(name, projectType, projectPath string) string {
+	// Check if there's a README file for description
+	readmeContent := fa.readREADME(projectPath)
+	if readmeContent != "" {
+		return fmt.Sprintf("%s: %s", name, readmeContent)
+	}
+
+	// Generate based on project type
+	switch projectType {
+	case "Node.js":
+		return fmt.Sprintf("%s: Node.js application with modern JavaScript/TypeScript stack", name)
+	case "PHP/Laravel":
+		return fmt.Sprintf("%s: PHP Laravel web application with MVC architecture", name)
+	case "Python":
+		return fmt.Sprintf("%s: Python application with modern development practices", name)
+	case "Go":
+		return fmt.Sprintf("%s: Go application built with clean architecture", name)
+	case "Java/Maven":
+		return fmt.Sprintf("%s: Java application built with Maven", name)
+	case "Java/Gradle":
+		return fmt.Sprintf("%s: Java application built with Gradle", name)
+	default:
+		return fmt.Sprintf("%s: Multi-language codebase", name)
+	}
+}
+
+func (fa *FileAnalyzer) readREADME(projectPath string) string {
+	readmeFiles := []string{"README.md", "readme.md", "README.txt", "readme.txt"}
+
+	for _, filename := range readmeFiles {
+		filePath := filepath.Join(projectPath, filename)
+		if content, err := os.ReadFile(filePath); err == nil {
+			lines := strings.Split(string(content), "\n")
+			// Get first meaningful line (skip empty lines and headers)
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "#") && len(line) > 10 {
+					if len(line) > 150 {
+						return line[:150] + "..."
+					}
+					return line
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (fa *FileAnalyzer) analyzeTechStack(projectPath, projectType string) []string {
+	techStack := []string{projectType}
+
+	// Check for specific framework files
+	frameworks := map[string]string{
+		"angular.json":     "Angular",
+		"vue.config.js":    "Vue.js",
+		"nuxt.config.js":   "Nuxt.js",
+		"next.config.js":   "Next.js",
+		"gatsby-config.js": "Gatsby",
+		"artisan":          "Laravel",
+		"manage.py":        "Django",
+		"requirements.txt": "Python",
+		"Pipfile":          "Pipenv",
+		"poetry.lock":      "Poetry",
+		"Cargo.toml":       "Rust",
+		"go.mod":           "Go Modules",
+	}
+
+	for file, tech := range frameworks {
+		if _, err := os.Stat(filepath.Join(projectPath, file)); err == nil {
+			techStack = append(techStack, tech)
+		}
+	}
+
+	// Check for database files
+	dbFiles := map[string]string{
+		"docker-compose.yml": "Docker",
+		".env":               "Environment Config",
+		"database.sql":       "SQL Database",
+		"mongodb.conf":       "MongoDB",
+	}
+
+	for file, tech := range dbFiles {
+		if _, err := os.Stat(filepath.Join(projectPath, file)); err == nil {
+			techStack = append(techStack, tech)
+		}
+	}
+
+	return techStack
+}
+
+func (fa *FileAnalyzer) generateArchitecture(projectType string) string {
+	switch projectType {
+	case "Node.js":
+		return "Client → Express/Fastify → Controllers → Services → Database"
+	case "PHP/Laravel":
+		return "Client → Routes → Controllers → Models → Database (MVC Pattern)"
+	case "Python":
+		return "Client → Flask/Django → Views → Models → Database"
+	case "Go":
+		return "Client → Handlers → Services → Repository → Database"
+	default:
+		return "Upload → Parse → Process → Generate Documentation"
+	}
+}
+
+func (fa *FileAnalyzer) analyzeFolderStructure(projectPath string) map[string]string {
+	structure := make(map[string]string)
+
+	// Read actual directories
+	entries, err := os.ReadDir(projectPath)
+	if err != nil {
+		return structure
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirName := entry.Name()
+			description := fa.describeFolderPurpose(dirName)
+			structure[dirName+"/"] = description
+		}
+	}
+
+	return structure
+}
+
+func (fa *FileAnalyzer) describeFolderPurpose(folderName string) string {
+	descriptions := map[string]string{
+		// Common web frameworks
+		"src":          "Source code files",
+		"lib":          "Library files",
+		"components":   "Reusable UI components",
+		"pages":        "Page components/views",
+		"assets":       "Static assets (images, fonts, etc.)",
+		"public":       "Public static files",
+		"dist":         "Distribution/build output",
+		"build":        "Build artifacts",
+		"node_modules": "Node.js dependencies",
+		"vendor":       "Third-party dependencies",
+
+		// Backend
+		"controllers": "Request handlers",
+		"models":      "Data models",
+		"views":       "View templates",
+		"routes":      "Route definitions",
+		"middleware":  "Middleware functions",
+		"services":    "Business logic services",
+		"utils":       "Utility functions",
+		"helpers":     "Helper functions",
+		"config":      "Configuration files",
+		"database":    "Database files/migrations",
+		"migrations":  "Database migrations",
+		"seeders":     "Database seeders",
+
+		// Testing
+		"tests":     "Test files",
+		"test":      "Test files",
+		"__tests__": "Jest test files",
+		"spec":      "Specification files",
+
+		// Documentation
+		"docs":          "Documentation files",
+		"documentation": "Project documentation",
+
+		// Others
+		"storage": "File storage",
+		"uploads": "Uploaded files",
+		"logs":    "Log files",
+		"cache":   "Cache files",
+		"tmp":     "Temporary files",
+		"temp":    "Temporary files",
+	}
+
+	if desc, exists := descriptions[strings.ToLower(folderName)]; exists {
+		return desc
+	}
+	return "Project specific directory"
+}
+
+func (fa *FileAnalyzer) generateSetupInstructions(projectType, projectName string) []string {
+	baseInstructions := []string{
+		fmt.Sprintf("git clone <repository-url>"),
+		fmt.Sprintf("cd %s", projectName),
+	}
+
+	switch projectType {
+	case "Node.js":
+		return append(baseInstructions, []string{
+			"npm install",
+			"npm run dev",
+		}...)
+	case "PHP/Laravel":
+		return append(baseInstructions, []string{
+			"composer install",
+			"cp .env.example .env",
+			"php artisan key:generate",
+			"php artisan serve",
+		}...)
+	case "Python":
+		return append(baseInstructions, []string{
+			"pip install -r requirements.txt",
+			"python manage.py migrate  # if Django",
+			"python manage.py runserver  # if Django",
+			"python app.py  # if Flask",
+		}...)
+	case "Go":
+		return append(baseInstructions, []string{
+			"go mod tidy",
+			"go run main.go",
+		}...)
+	default:
+		return append(baseInstructions, "Follow project-specific setup instructions")
+	}
+}
+
+func (fa *FileAnalyzer) detectAPIEndpoints(projectPath, projectType string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+
+	// Parse routes based on project type
+	switch projectType {
+	case "Node.js":
+		endpoints = fa.parseNodeJSRoutes(projectPath)
+	case "PHP/Laravel":
+		endpoints = fa.parseLaravelRoutes(projectPath)
+	case "Go":
+		endpoints = fa.parseGoRoutes(projectPath)
+	case "Python":
+		endpoints = fa.parsePythonRoutes(projectPath)
+	case "Java/Maven", "Java/Gradle":
+		endpoints = fa.parseJavaRoutes(projectPath)
+		// case "Ruby/Rails":
+		// 	endpoints = fa.parseRubyRoutes(projectPath)
+		// case ".NET":
+		// 	endpoints = fa.parseDotNetRoutes(projectPath)
+	}
+
+	// Add common endpoints if none found
+	if len(endpoints) == 0 {
+		endpoints = fa.generateGenericEndpoints(projectType)
+	}
+
+	// Post-process endpoints
+	endpoints = fa.normalizeEndpoints(endpoints)
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) parseNodeJSRoutes(projectPath string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+
+	// Common route file patterns in Node.js projects
+	routeFiles := []string{
+		"routes/*.js",
+		"routes/*.ts",
+		"src/routes/*.js",
+		"src/routes/*.ts",
+		"app.js",
+		"app.ts",
+		"server.js",
+		"server.ts",
+		"index.js",
+		"index.ts",
+	}
+
+	// Walk through all potential route files
+	for _, pattern := range routeFiles {
+		matches, err := filepath.Glob(filepath.Join(projectPath, pattern))
+		if err != nil {
+			continue
+		}
+
+		for _, file := range matches {
+			content, err := os.ReadFile(file)
+			if err != nil {
+				continue
+			}
+
+			// Check for Express, Fastify, Koa, etc.
+			endpoints = append(endpoints, fa.extractExpressRoutes(string(content))...)
+			endpoints = append(endpoints, fa.extractFastifyRoutes(string(content))...)
+			// endpoints = append(endpoints, fa.extractKoaRoutes(string(content))...)
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) extractExpressRoutes(content string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Match patterns like: app.get('/path', handler)
+		// or router.post('/path', handler)
+		if strings.Contains(line, ".get(") || strings.Contains(line, ".post(") ||
+			strings.Contains(line, ".put(") || strings.Contains(line, ".delete(") ||
+			strings.Contains(line, ".patch(") || strings.Contains(line, ".options(") ||
+			strings.Contains(line, ".all(") || strings.Contains(line, ".use(") {
+
+			var method string
+			switch {
+			case strings.Contains(line, ".get("):
+				method = "GET"
+			case strings.Contains(line, ".post("):
+				method = "POST"
+			case strings.Contains(line, ".put("):
+				method = "PUT"
+			case strings.Contains(line, ".delete("):
+				method = "DELETE"
+			case strings.Contains(line, ".patch("):
+				method = "PATCH"
+			case strings.Contains(line, ".options("):
+				method = "OPTIONS"
+			case strings.Contains(line, ".all("):
+				method = "ALL"
+			case strings.Contains(line, ".use("):
+				method = "MIDDLEWARE"
+			}
+
+			// Extract path
+			path := fa.extractPathFromRoute(line)
+			if path == "" {
+				continue
+			}
+
+			endpoints = append(endpoints, models.APIEndpoint{
+				Method:      method,
+				Path:        path,
+				Description: fmt.Sprintf("Express route from %s", method),
+				CurlExample: fmt.Sprintf("curl -X %s http://localhost:3000%s", method, path),
+			})
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) extractFastifyRoutes(content string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Fastify route registration patterns
+		if strings.Contains(line, "fastify.get(") || strings.Contains(line, "fastify.post(") ||
+			strings.Contains(line, "fastify.route(") || strings.Contains(line, "fastify.register(") {
+
+			var method string
+			switch {
+			case strings.Contains(line, "fastify.get("):
+				method = "GET"
+			case strings.Contains(line, "fastify.post("):
+				method = "POST"
+			case strings.Contains(line, "fastify.put("):
+				method = "PUT"
+			case strings.Contains(line, "fastify.delete("):
+				method = "DELETE"
+			case strings.Contains(line, "fastify.route("):
+				// Need to parse the method from the route config object
+				method = fa.extractFastifyRouteMethod(line)
+			default:
+				method = "GET"
+			}
+
+			path := fa.extractPathFromRoute(line)
+			if path == "" {
+				continue
+			}
+
+			endpoints = append(endpoints, models.APIEndpoint{
+				Method:      method,
+				Path:        path,
+				Description: "Fastify route",
+				CurlExample: fmt.Sprintf("curl -X %s http://localhost:3000%s", method, path),
+			})
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) extractPathFromRoute(line string) string {
+	// Extract path from route definitions between quotes
+	quoteChars := []rune{'\'', '"', '`'}
+
+	for _, quote := range quoteChars {
+		quoteStr := string(quote)
+		startIdx := strings.Index(line, quoteStr)
+		if startIdx == -1 {
+			continue
+		}
+
+		endIdx := strings.Index(line[startIdx+1:], quoteStr)
+		if endIdx == -1 {
+			continue
+		}
+
+		path := line[startIdx+1 : startIdx+1+endIdx]
+
+		// Clean up path (remove regex patterns, etc.)
+		path = strings.Split(path, "?")[0]
+		path = strings.Split(path, "(")[0]
+		path = strings.TrimSpace(path)
+
+		if path != "" {
+			return path
+		}
+	}
+
+	return ""
+}
+
+func (fa *FileAnalyzer) parseLaravelRoutes(projectPath string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+
+	// Laravel route files
+	routeFiles := []string{
+		"routes/web.php",
+		"routes/api.php",
+		"routes/console.php",
+		"routes/channels.php",
+	}
+
+	for _, routeFile := range routeFiles {
+		filePath := filepath.Join(projectPath, routeFile)
+		if content, err := os.ReadFile(filePath); err == nil {
+			endpoints = append(endpoints, fa.extractLaravelRoutes(string(content))...)
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) extractLaravelRoutes(content string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Match Laravel route definitions
+		if strings.HasPrefix(line, "Route::") {
+			var method string
+			switch {
+			case strings.HasPrefix(line, "Route::get("):
+				method = "GET"
+			case strings.HasPrefix(line, "Route::post("):
+				method = "POST"
+			case strings.HasPrefix(line, "Route::put("):
+				method = "PUT"
+			case strings.HasPrefix(line, "Route::delete("):
+				method = "DELETE"
+			case strings.HasPrefix(line, "Route::patch("):
+				method = "PATCH"
+			case strings.HasPrefix(line, "Route::options("):
+				method = "OPTIONS"
+			case strings.HasPrefix(line, "Route::match("):
+				methods := fa.extractLaravelMatchMethods(line)
+				for _, m := range methods {
+					endpoint := fa.createLaravelEndpoint(m, line)
+					if endpoint != nil {
+						endpoints = append(endpoints, *endpoint)
+					}
+				}
+				continue
+			case strings.HasPrefix(line, "Route::any("):
+				method = "ANY"
+			case strings.HasPrefix(line, "Route::resource("):
+				endpoints = append(endpoints, fa.extractLaravelResourceRoutes(line)...)
+				continue
+			default:
+				continue
+			}
+
+			endpoint := fa.createLaravelEndpoint(method, line)
+			if endpoint != nil {
+				endpoints = append(endpoints, *endpoint)
+			}
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) createLaravelEndpoint(method, line string) *models.APIEndpoint {
+	path := fa.extractLaravelRoutePath(line)
+	if path == "" {
+		return nil
+	}
+
+	return &models.APIEndpoint{
+		Method:      method,
+		Path:        path,
+		Description: fmt.Sprintf("Laravel %s route", method),
+		CurlExample: fmt.Sprintf("curl -X %s http://localhost:8000%s", method, path),
+	}
+}
+
+func (fa *FileAnalyzer) extractLaravelRoutePath(line string) string {
+	// Extract path between quotes
+	quoteChars := []rune{'\'', '"'}
+
+	for _, quote := range quoteChars {
+		quoteStr := string(quote)
+		startIdx := strings.Index(line, quoteStr)
+		if startIdx == -1 {
+			continue
+		}
+
+		endIdx := strings.Index(line[startIdx+1:], quoteStr)
+		if endIdx == -1 {
+			continue
+		}
+
+		path := line[startIdx+1 : startIdx+1+endIdx]
+		path = strings.TrimSpace(path)
+
+		if path != "" {
+			// Handle prefix if it's an API route
+			if strings.Contains(line, "routes/api.php") && !strings.HasPrefix(path, "/api") {
+				path = "/api" + path
+			}
+			return path
+		}
+	}
+
+	return ""
+}
+
+func (fa *FileAnalyzer) extractLaravelMatchMethods(line string) []string {
+	// Extract methods from Route::match(['GET', 'POST'], ...)
+	startIdx := strings.Index(line, "[")
+	if startIdx == -1 {
+		return nil
+	}
+
+	endIdx := strings.Index(line[startIdx:], "]")
+	if endIdx == -1 {
+		return nil
+	}
+
+	methodsStr := line[startIdx+1 : startIdx+endIdx]
+	methods := strings.Split(methodsStr, ",")
+
+	var cleanedMethods []string
+	for _, m := range methods {
+		m = strings.Trim(m, " '\"")
+		m = strings.ToUpper(m)
+		if m != "" {
+			cleanedMethods = append(cleanedMethods, m)
+		}
+	}
+
+	return cleanedMethods
+}
+
+func (fa *FileAnalyzer) extractLaravelResourceRoutes(line string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	path := fa.extractLaravelRoutePath(line)
+	if path == "" {
+		return endpoints
+	}
+
+	// Standard Laravel resource routes
+	resourceRoutes := []struct {
+		Method string
+		Path   string
+	}{
+		{"GET", path},
+		{"GET", path + "/create"},
+		{"POST", path},
+		{"GET", path + "/{id}"},
+		{"GET", path + "/{id}/edit"},
+		{"PUT/PATCH", path + "/{id}"},
+		{"DELETE", path + "/{id}"},
+	}
+
+	for _, route := range resourceRoutes {
+		endpoints = append(endpoints, models.APIEndpoint{
+			Method:      route.Method,
+			Path:        route.Path,
+			Description: fmt.Sprintf("Laravel resource route: %s", route.Method),
+			CurlExample: fmt.Sprintf("curl -X %s http://localhost:8000%s",
+				strings.Split(route.Method, "/")[0], route.Path),
+		})
+	}
+
+	return endpoints
+}
+func (fa *FileAnalyzer) parsePythonRoutes(projectPath string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+
+	// Check for Flask/Django/FastAPI projects
+	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".py") {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		// Check for Flask routes
+		if strings.Contains(string(content), "@app.route(") {
+			endpoints = append(endpoints, fa.extractFlaskRoutes(string(content))...)
+		}
+
+		// Check for FastAPI routes
+		if strings.Contains(string(content), "@app.get(") ||
+			strings.Contains(string(content), "@app.post(") {
+			// endpoints = append(endpoints, fa.extractFastAPIRoutes(string(content))...)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) extractFlaskRoutes(content string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "@app.route(") {
+			parts := strings.Split(line, "@app.route(")
+			if len(parts) < 2 {
+				continue
+			}
+
+			routeDef := parts[1]
+			// Extract path and methods
+			pathStart := strings.Index(routeDef, "'")
+			if pathStart == -1 {
+				pathStart = strings.Index(routeDef, "\"")
+			}
+			if pathStart == -1 {
+				continue
+			}
+
+			pathEnd := strings.Index(routeDef[pathStart+1:], "'")
+			if pathEnd == -1 {
+				pathEnd = strings.Index(routeDef[pathStart+1:], "\"")
+			}
+			if pathEnd == -1 {
+				continue
+			}
+
+			path := routeDef[pathStart+1 : pathStart+1+pathEnd]
+			method := "GET" // default
+
+			// Check for methods parameter
+			if strings.Contains(routeDef, "methods=[") {
+				methodsStart := strings.Index(routeDef, "methods=[") + 8
+				methodsEnd := strings.Index(routeDef[methodsStart:], "]")
+				if methodsEnd > 0 {
+					methods := routeDef[methodsStart : methodsStart+methodsEnd]
+					if strings.Contains(methods, "'POST'") || strings.Contains(methods, "\"POST\"") {
+						method = "POST"
+					} else if strings.Contains(methods, "'PUT'") || strings.Contains(methods, "\"PUT\"") {
+						method = "PUT"
+					} else if strings.Contains(methods, "'DELETE'") || strings.Contains(methods, "\"DELETE\"") {
+						method = "DELETE"
+					}
+				}
+			}
+
+			endpoints = append(endpoints, models.APIEndpoint{
+				Method:      method,
+				Path:        path,
+				Description: fmt.Sprintf("Flask route: %s", path),
+				CurlExample: fmt.Sprintf("curl -X %s http://localhost:5000%s", method, path),
+			})
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) parseJavaRoutes(projectPath string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+
+	// Check for Spring Boot projects
+	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".java") {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		// Check for Spring annotations
+		if strings.Contains(string(content), "@RestController") ||
+			strings.Contains(string(content), "@RequestMapping") {
+			endpoints = append(endpoints, fa.extractSpringRoutes(string(content), path)...)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) extractSpringRoutes(content, filePath string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	var classPath string
+	var inController bool
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Find class-level request mapping
+		if strings.Contains(trimmed, "@RequestMapping(") {
+			pathStart := strings.Index(trimmed, "\"")
+			if pathStart == -1 {
+				continue
+			}
+			pathEnd := strings.Index(trimmed[pathStart+1:], "\"")
+			if pathEnd == -1 {
+				continue
+			}
+			classPath = trimmed[pathStart+1 : pathStart+1+pathEnd]
+		}
+
+		// Check if we're in a controller class
+		if strings.Contains(trimmed, "@RestController") {
+			inController = true
+		}
+
+		if inController {
+			// Find method-level mappings
+			if strings.Contains(trimmed, "@GetMapping(") ||
+				strings.Contains(trimmed, "@PostMapping(") ||
+				strings.Contains(trimmed, "@PutMapping(") ||
+				strings.Contains(trimmed, "@DeleteMapping(") ||
+				strings.Contains(trimmed, "@RequestMapping(") {
+
+				var method, path string
+
+				// Determine HTTP method
+				switch {
+				case strings.Contains(trimmed, "@GetMapping("):
+					method = "GET"
+				case strings.Contains(trimmed, "@PostMapping("):
+					method = "POST"
+				case strings.Contains(trimmed, "@PutMapping("):
+					method = "PUT"
+				case strings.Contains(trimmed, "@DeleteMapping("):
+					method = "DELETE"
+				default:
+					method = "GET" // default for @RequestMapping
+				}
+
+				// Extract path
+				pathStart := strings.Index(trimmed, "\"")
+				if pathStart == -1 {
+					continue
+				}
+				pathEnd := strings.Index(trimmed[pathStart+1:], "\"")
+				if pathEnd == -1 {
+					continue
+				}
+				path = trimmed[pathStart+1 : pathStart+1+pathEnd]
+
+				// Combine with class path if exists
+				fullPath := path
+				if classPath != "" {
+					fullPath = classPath + path
+				}
+
+				endpoints = append(endpoints, models.APIEndpoint{
+					Method:      method,
+					Path:        fullPath,
+					Description: fmt.Sprintf("Spring controller in %s", filepath.Base(filePath)),
+					CurlExample: fmt.Sprintf("curl -X %s http://localhost:8080%s", method, fullPath),
+				})
+			}
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) generateGenericEndpoints(projectType string) []models.APIEndpoint {
+	basePort := 3000
+	switch projectType {
+	case "Python":
+		basePort = 5000
+	case "Java/Maven", "Java/Gradle":
+		basePort = 8080
+	case "Ruby/Rails":
+		basePort = 3000
+	case ".NET":
+		basePort = 5000
+	case "Go":
+		basePort = 8080
+	}
+
+	return []models.APIEndpoint{
+		{
+			Method:      "GET",
+			Path:        "/",
+			Description: "Home page",
+			CurlExample: fmt.Sprintf("curl http://localhost:%d/", basePort),
+		},
+		{
+			Method:      "GET",
+			Path:        "/api/health",
+			Description: "Health check endpoint",
+			CurlExample: fmt.Sprintf("curl http://localhost:%d/api/health", basePort),
+		},
+		{
+			Method:      "GET",
+			Path:        "/api/version",
+			Description: "API version information",
+			CurlExample: fmt.Sprintf("curl http://localhost:%d/api/version", basePort),
+		},
+	}
+}
+
+func (fa *FileAnalyzer) normalizeEndpoints(endpoints []models.APIEndpoint) []models.APIEndpoint {
+	// Remove duplicates
+	seen := make(map[string]bool)
+	result := make([]models.APIEndpoint, 0, len(endpoints))
+
+	for _, ep := range endpoints {
+		key := fmt.Sprintf("%s:%s", ep.Method, ep.Path)
+		if !seen[key] {
+			seen[key] = true
+			result = append(result, ep)
+		}
+	}
+
+	// Sort by path
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Path < result[j].Path
+	})
+
+	return result
+}
+
+func (fa *FileAnalyzer) extractExpressRoutes(content string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Look for Express route patterns
+		if strings.Contains(line, ".get(") || strings.Contains(line, ".post(") ||
+			strings.Contains(line, ".put(") || strings.Contains(line, ".delete(") {
+			endpoint := fa.parseExpressRoute(line)
+			if endpoint.Path != "" {
+				endpoints = append(endpoints, endpoint)
+			}
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) parseExpressRoute(line string) models.APIEndpoint {
+	// Simple regex-like parsing for Express routes
+	// app.get('/api/users', handler) or router.post('/login', handler)
+
+	var method, path string
+
+	if strings.Contains(line, ".get(") {
+		method = "GET"
+	} else if strings.Contains(line, ".post(") {
+		method = "POST"
+	} else if strings.Contains(line, ".put(") {
+		method = "PUT"
+	} else if strings.Contains(line, ".delete(") {
+		method = "DELETE"
+	}
+
+	// Extract path from quotes
+	start := strings.Index(line, "'")
+	if start == -1 {
+		start = strings.Index(line, "\"")
+	}
+	if start != -1 {
+		end := strings.Index(line[start+1:], "'")
+		if end == -1 {
+			end = strings.Index(line[start+1:], "\"")
+		}
+		if end != -1 {
+			path = line[start+1 : start+1+end]
+		}
+	}
+
+	if method != "" && path != "" {
+		return models.APIEndpoint{
+			Method:      method,
+			Path:        path,
+			Description: fmt.Sprintf("%s endpoint", path),
+			CurlExample: fmt.Sprintf("curl -X %s http://localhost:3000%s", method, path),
+		}
+	}
+
+	return models.APIEndpoint{}
+}
+
+func ExtractLaravelRoutes(basePath string) ([]Route, error) {
+	routeFiles := []string{"routes/web.php", "routes/api.php"}
+	var routes []Route
+
+	for _, file := range routeFiles {
+		fullPath := filepath.Join(basePath, file)
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			continue
+		}
+
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			// Example: Route::get('/users', 'UserController@index');
+			routeRegex := regexp.MustCompile(`Route::(get|post|put|delete)\('([^']+)',\s*'([^']+)'\)`)
+			if match := routeRegex.FindStringSubmatch(line); match != nil {
+				routes = append(routes, Route{
+					Method:  strings.ToUpper(match[1]),
+					URI:     match[2],
+					Handler: match[3],
+				})
+			}
+		}
+	}
+
+	return routes, nil
+}
+
+// extractLaravelMiddleware scans for Laravel's Kernel.php and parses middleware arrays.
+// Returns a []string of middleware names (global + route middleware keys).
+func (fa *FileAnalyzer) extractLaravelMiddleware(projectPath string) []string {
+	var middleware []string
+
+	// Look for app/Http/Kernel.php
+	kernelPath := filepath.Join(projectPath, "app/Http/Kernel.php")
+	data, err := os.ReadFile(kernelPath)
+	if err != nil {
+		return middleware // file not found, return empty
+	}
+	content := string(data)
+
+	// Parse $middleware = [ ... ];
+	insideGlobal := false
+	for _, line := range strings.Split(content, "\n") {
+		trim := strings.TrimSpace(line)
+		if strings.HasPrefix(trim, "$middleware") && strings.Contains(trim, "[") {
+			insideGlobal = true
+			continue
+		}
+		if insideGlobal {
+			if strings.Contains(trim, "];") {
+				insideGlobal = false
+				continue
+			}
+			// Expect: \App\Http\Middleware\TrustProxies::class,
+			if idx := strings.Index(trim, "::class"); idx != -1 {
+				mid := trim[:idx]
+				mid = strings.Trim(mid, "'\" ,")
+				middleware = append(middleware, mid)
+			}
+		}
+	}
+
+	// Parse $routeMiddleware = [ ... ];
+	insideRoute := false
+	for _, line := range strings.Split(content, "\n") {
+		trim := strings.TrimSpace(line)
+		if strings.HasPrefix(trim, "$routeMiddleware") && strings.Contains(trim, "[") {
+			insideRoute = true
+			continue
+		}
+		if insideRoute {
+			if strings.Contains(trim, "];") {
+				insideRoute = false
+				continue
+			}
+			// Expect: 'auth' => \App\Http\Middleware\Authenticate::class,
+			if arr := strings.SplitN(trim, "=>", 2); len(arr) == 2 {
+				key := strings.Trim(arr[0], "'\" ,")
+				middleware = append(middleware, key)
+			}
+		}
+	}
+
+	return fa.removeDuplicates(middleware)
+}
+
+func (fa *FileAnalyzer) extractLaravelRoutes(content string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Route::") {
+			endpoint := fa.parseLaravelRoute(line)
+			if endpoint.Path != "" {
+				endpoints = append(endpoints, endpoint)
+			}
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) parseLaravelRoute(line string) models.APIEndpoint {
+	// Parse Laravel routes like: Route::get('/users', 'UserController@index');
+
+	var method, path string
+
+	if strings.Contains(line, "Route::get(") {
+		method = "GET"
+	} else if strings.Contains(line, "Route::post(") {
+		method = "POST"
+	} else if strings.Contains(line, "Route::put(") {
+		method = "PUT"
+	} else if strings.Contains(line, "Route::delete(") {
+		method = "DELETE"
+	}
+
+	// Extract path
+	start := strings.Index(line, "'")
+	if start == -1 {
+		start = strings.Index(line, "\"")
+	}
+	if start != -1 {
+		end := strings.Index(line[start+1:], "'")
+		if end == -1 {
+			end = strings.Index(line[start+1:], "\"")
+		}
+		if end != -1 {
+			path = line[start+1 : start+1+end]
+		}
+	}
+
+	if method != "" && path != "" {
+		return models.APIEndpoint{
+			Method:      method,
+			Path:        path,
+			Description: fmt.Sprintf("%s endpoint", path),
+			CurlExample: fmt.Sprintf("curl -X %s http://localhost:8000%s", method, path),
+		}
+	}
+
+	return models.APIEndpoint{}
+}
+
+func (fa *FileAnalyzer) parseGoRoutes(projectPath string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+
+	// Look for Go files with route definitions
+	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if strings.HasSuffix(path, ".go") {
+			if content, err := os.ReadFile(path); err == nil {
+				endpoints = append(endpoints, fa.extractGoRoutes(string(content))...)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return endpoints
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) extractGoRoutes(content string) []models.APIEndpoint {
+	var endpoints []models.APIEndpoint
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Look for Fiber/Gin/Mux route patterns
+		if strings.Contains(line, ".Get(") || strings.Contains(line, ".Post(") ||
+			strings.Contains(line, ".Put(") || strings.Contains(line, ".Delete(") {
+			endpoint := fa.parseGoRoute(line)
+			if endpoint.Path != "" {
+				endpoints = append(endpoints, endpoint)
+			}
+		}
+	}
+
+	return endpoints
+}
+
+func (fa *FileAnalyzer) parseGoRoute(line string) models.APIEndpoint {
+	var method, path string
+
+	if strings.Contains(line, ".Get(") {
+		method = "GET"
+	} else if strings.Contains(line, ".Post(") {
+		method = "POST"
+	} else if strings.Contains(line, ".Put(") {
+		method = "PUT"
+	} else if strings.Contains(line, ".Delete(") {
+		method = "DELETE"
+	}
+
+	// Extract path from quotes
+	start := strings.Index(line, "\"")
+	if start != -1 {
+		end := strings.Index(line[start+1:], "\"")
+		if end != -1 {
+			path = line[start+1 : start+1+end]
+		}
+	}
+
+	if method != "" && path != "" {
+		return models.APIEndpoint{
+			Method:      method,
+			Path:        path,
+			Description: fmt.Sprintf("%s endpoint", path),
+			CurlExample: fmt.Sprintf("curl -X %s http://localhost:3000%s", method, path),
+		}
+	}
+
+	return models.APIEndpoint{}
+}
+
+func (fa *FileAnalyzer) generateParsersInfo(projectType string) map[string]string {
+	parsers := make(map[string]string)
+
+	switch projectType {
+	case "Node.js":
+		parsers["package.json"] = "JSON parser for dependencies and scripts"
+		parsers["JavaScript"] = "AST parser for function and class extraction"
+	case "PHP/Laravel":
+		parsers["composer.json"] = "JSON parser for PHP dependencies"
+		parsers["PHP"] = "Token parser for classes and methods"
+	case "Python":
+		parsers["requirements.txt"] = "Line-by-line dependency parser"
+		parsers["Python"] = "AST parser for functions and classes"
+	case "Go":
+		parsers["go.mod"] = "Module parser for dependencies"
+		parsers["Go"] = "AST parser for packages and functions"
+	default:
+		parsers["Generic"] = "File extension based language detection"
+	}
+
+	return parsers
+}
+
+func (fa *FileAnalyzer) generateDataFlow(projectType string) string {
+	switch projectType {
+	case "Node.js":
+		return "Client Request → Express Router → Controller → Service → Database → Response"
+	case "PHP/Laravel":
+		return "HTTP Request → Routes → Middleware → Controller → Model → Database → Response"
+	case "Python":
+		return "Client → WSGI → Framework → View → Model → Database → Template → Response"
+	case "Go":
+		return "HTTP Request → Router → Handler → Service → Repository → Database → JSON Response"
+	default:
+		return "Input → Processing → Business Logic → Data Layer → Output"
+	}
+}
+
+func (fa *FileAnalyzer) detectExternalServices(projectPath string) []string {
+	var services []string
+
+	// Check common config files for external services
+	configFiles := map[string][]string{
+		".env":               {"DATABASE_URL", "REDIS_URL", "MONGODB_URI", "AWS_", "STRIPE_", "SENDGRID_"},
+		"docker-compose.yml": {"redis", "postgres", "mysql", "mongodb", "elasticsearch"},
+		"package.json":       {"aws-sdk", "stripe", "nodemailer", "redis", "mongoose"},
+		"requirements.txt":   {"boto3", "stripe", "celery", "redis", "pymongo"},
+		"composer.json":      {"aws/aws-sdk-php", "stripe/stripe-php", "predis/predis"},
+	}
+
+	for configFile, keywords := range configFiles {
+		filePath := filepath.Join(projectPath, configFile)
+		if content, err := os.ReadFile(filePath); err == nil {
+			contentStr := string(content)
+			for _, keyword := range keywords {
+				if strings.Contains(strings.ToLower(contentStr), strings.ToLower(keyword)) {
+					services = append(services, fa.mapKeywordToService(keyword))
+				}
+			}
+		}
+	}
+
+	if len(services) == 0 {
+		services = []string{"No external services detected"}
+	}
+
+	return fa.removeDuplicates(services)
+}
+
+func (fa *FileAnalyzer) mapKeywordToService(keyword string) string {
+	serviceMap := map[string]string{
+		"DATABASE_URL":  "PostgreSQL",
+		"REDIS_URL":     "Redis",
+		"MONGODB_URI":   "MongoDB",
+		"AWS_":          "Amazon Web Services",
+		"STRIPE_":       "Stripe Payment",
+		"SENDGRID_":     "SendGrid Email",
+		"redis":         "Redis",
+		"postgres":      "PostgreSQL",
+		"mysql":         "MySQL",
+		"mongodb":       "MongoDB",
+		"elasticsearch": "Elasticsearch",
+		"aws-sdk":       "Amazon Web Services",
+		"stripe":        "Stripe",
+		"nodemailer":    "Email Service",
+		"mongoose":      "MongoDB",
+		"boto3":         "Amazon Web Services",
+		"celery":        "Celery Task Queue",
+		"pymongo":       "MongoDB",
+	}
+
+	for key, service := range serviceMap {
+		if strings.Contains(strings.ToLower(keyword), strings.ToLower(key)) {
+			return service
+		}
+	}
+	return keyword
+}
+
+func (fa *FileAnalyzer) removeDuplicates(slice []string) []string {
+	keys := make(map[string]bool)
+	var result []string
+
+	for _, item := range slice {
+		if !keys[item] {
+			keys[item] = true
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
+func (fa *FileAnalyzer) generateDeploymentInfo(projectPath, projectType string) []string {
+	var deploymentInfo []string
+
+	// Check for deployment files
+	deploymentFiles := map[string]string{
+		"Dockerfile":         "Docker containerization available",
+		"docker-compose.yml": "Docker Compose setup available",
+		"vercel.json":        "Vercel deployment configuration",
+		"netlify.toml":       "Netlify deployment configuration",
+		"heroku.yml":         "Heroku deployment configuration",
+		".github/workflows":  "GitHub Actions CI/CD setup",
+		"railway.json":       "Railway deployment configuration",
+	}
+
+	for file, description := range deploymentFiles {
+		if _, err := os.Stat(filepath.Join(projectPath, file)); err == nil {
+			deploymentInfo = append(deploymentInfo, description)
+		}
+	}
+
+	// Add project type specific deployment info
+	switch projectType {
+	case "Node.js":
+		deploymentInfo = append(deploymentInfo, "Can be deployed to Vercel, Netlify, or Heroku")
+	case "PHP/Laravel":
+		deploymentInfo = append(deploymentInfo, "Can be deployed to shared hosting, VPS, or cloud platforms")
+	case "Python":
+		deploymentInfo = append(deploymentInfo, "Can be deployed to Heroku, PythonAnywhere, or cloud platforms")
+	case "Go":
+		deploymentInfo = append(deploymentInfo, "Can be compiled and deployed anywhere as a single binary")
+	}
+
+	if len(deploymentInfo) == 0 {
+		deploymentInfo = []string{"Standard deployment practices apply for " + projectType}
+	}
+
+	return deploymentInfo
+}
+
+func (fa *FileAnalyzer) generateFutureRoadmap(projectType string) []string {
+	roadmapItems := []string{
+		"Add comprehensive unit tests",
+		"Implement CI/CD pipeline",
+		"Add API documentation",
+		"Performance optimization",
+		"Security audit and improvements",
+	}
+
+	// Add project-specific roadmap items
+	switch projectType {
+	case "Node.js":
+		roadmapItems = append(roadmapItems,
+			"Add TypeScript support",
+			"Implement GraphQL API",
+			"Add real-time features with WebSockets")
+	case "PHP/Laravel":
+		roadmapItems = append(roadmapItems,
+			"Add Laravel Sanctum for API authentication",
+			"Implement job queues",
+			"Add caching layer")
+	case "Python":
+		roadmapItems = append(roadmapItems,
+			"Add async/await support",
+			"Implement database migrations",
+			"Add containerization")
+	case "Go":
+		roadmapItems = append(roadmapItems,
+			"Add gRPC support",
+			"Implement microservices architecture",
+			"Add observability and monitoring")
+	}
+
+	return roadmapItems
+}
+
+func (fa *FileAnalyzer) generateCommonIssues(projectType string) []string {
+	commonIssues := []string{
+		"Environment variables not set correctly",
+		"Database connection issues",
+		"Port already in use",
+		"Missing dependencies",
+	}
+
+	switch projectType {
+	case "Node.js":
+		commonIssues = append(commonIssues,
+			"Node version compatibility issues",
+			"NPM package conflicts",
+			"Memory issues with large applications")
+	case "PHP/Laravel":
+		commonIssues = append(commonIssues,
+			"Composer memory limit exceeded",
+			"File permissions issues",
+			"Laravel key not set")
+	case "Python":
+		commonIssues = append(commonIssues,
+			"Python version compatibility",
+			"Virtual environment issues",
+			"Package installation conflicts")
+	case "Go":
+		commonIssues = append(commonIssues,
+			"Go module version conflicts",
+			"Cross-compilation issues",
+			"CGO dependency problems")
+	}
+
+	return commonIssues
+}
+
+func (fa *FileAnalyzer) generateDeveloperNotes(projectPath, projectType string) []string {
+	var notes []string
+
+	// Check for specific files that might need attention
+	if _, err := os.Stat(filepath.Join(projectPath, ".env.example")); err == nil {
+		notes = append(notes, "Copy .env.example to .env and configure environment variables")
+	}
+
+	if _, err := os.Stat(filepath.Join(projectPath, "README.md")); err == nil {
+		notes = append(notes, "Check README.md for additional setup instructions")
+	}
+
+	// Add project-specific notes
+	switch projectType {
+	case "Node.js":
+		notes = append(notes,
+			"Use 'npm run dev' for development mode",
+			"Check package.json scripts for available commands")
+	case "PHP/Laravel":
+		notes = append(notes,
+			"Run 'php artisan migrate' before first use",
+			"Use 'php artisan serve' for local development")
+	case "Python":
+		notes = append(notes,
+			"Create virtual environment before installing dependencies",
+			"Check for requirements-dev.txt for development dependencies")
+	case "Go":
+		notes = append(notes,
+			"Use 'go mod tidy' to clean up dependencies",
+			"Run with 'go run .' or build with 'go build'")
+	}
+
+	notes = append(notes, "This documentation was auto-generated from code analysis")
+
+	return notes
+}
+
+func (fa *FileAnalyzer) detectProjectType(projectPath string) string {
+	// Check for various project indicators
+	indicators := map[string]string{
+		"package.json":     "Node.js",
+		"composer.json":    "PHP/Laravel",
+		"requirements.txt": "Python",
+		"go.mod":           "Go",
+		"pom.xml":          "Java/Maven",
+		"build.gradle":     "Java/Gradle",
+		"Cargo.toml":       "Rust",
+		"pubspec.yaml":     "Dart/Flutter",
+	}
+
+	for file, projectType := range indicators {
+		if _, err := os.Stat(filepath.Join(projectPath, file)); err == nil {
+			return projectType
+		}
+	}
+
+	return "Unknown"
+}
+
+func (fa *FileAnalyzer) parseDependencies(projectPath string, project *models.Project) error {
+	switch project.Type {
+	case "Node.js":
+		return fa.parsePackageJSON(projectPath, project)
+	case "PHP/Laravel":
+		return fa.parseComposerJSON(projectPath, project)
+	case "Python":
+		return nil
+		// return fa.parseRequirementsTxt(projectPath, project)
+	case "Go":
+		return nil
+		// return fa.parseGoMod(projectPath, project)
+	}
+	return nil
+}
+
+func (fa *FileAnalyzer) parsePackageJSON(projectPath string, project *models.Project) error {
+	packagePath := filepath.Join(projectPath, "package.json")
+	data, err := os.ReadFile(packagePath)
+	if err != nil {
+		return err
+	}
+
+	var pkg struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return err
+	}
+
+	// Parse dependencies
+	for name, version := range pkg.Dependencies {
+		project.Dependencies["production"] = append(project.Dependencies["production"],
+			models.Dependency{Name: name, Version: version, Type: "production"})
+	}
+
+	for name, version := range pkg.DevDependencies {
+		project.Dependencies["development"] = append(project.Dependencies["development"],
+			models.Dependency{Name: name, Version: version, Type: "development"})
+	}
+
+	return nil
+}
+
+func (fa *FileAnalyzer) parseComposerJSON(projectPath string, project *models.Project) error {
+	composerPath := filepath.Join(projectPath, "composer.json")
+	data, err := os.ReadFile(composerPath)
+	if err != nil {
+		return err
+	}
+
+	var composer struct {
+		Require    map[string]string `json:"require"`
+		RequireDev map[string]string `json:"require-dev"`
+	}
+
+	if err := json.Unmarshal(data, &composer); err != nil {
+		return err
+	}
+
+	// Parse dependencies
+	for name, version := range composer.Require {
+		project.Dependencies["production"] = append(project.Dependencies["production"],
+			models.Dependency{Name: name, Version: version, Type: "production"})
+	}
+
+	for name, version := range composer.RequireDev {
+		project.Dependencies["development"] = append(project.Dependencies["development"],
+			models.Dependency{Name: name, Version: version, Type: "development"})
+	}
+
+	return nil
+}
+
+func (fa *FileAnalyzer) buildDirectoryStructure(projectPath string, project *models.Project) error {
+	// Create a map to store nodes by their path
+	nodes := make(map[string]*models.DirectoryNode)
+
+	// First pass: create all nodes
+	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip hidden files and common ignore patterns
+		if fa.shouldSkip(path, info) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		relPath, _ := filepath.Rel(projectPath, path)
+		if relPath == "." {
+			nodes[relPath] = &models.DirectoryNode{
+				Name:     filepath.Base(projectPath),
+				Path:     relPath,
+				IsDir:    true,
+				Children: []models.DirectoryNode{},
+			}
+			return nil
+		}
+
+		nodes[relPath] = &models.DirectoryNode{
+			Name:  info.Name(),
+			Path:  relPath,
+			IsDir: info.IsDir(),
+			Size:  info.Size(),
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Second pass: build the tree structure
+	for path, node := range nodes {
+		if path == "." {
+			// This is the root node
+			project.Structure = append(project.Structure, *node)
+			continue
+		}
+
+		// Find parent directory
+		parentPath := filepath.Dir(path)
+		if parentPath == "." {
+			parentPath = "./"
+		}
+
+		if parent, exists := nodes[parentPath]; exists {
+			parent.Children = append(parent.Children, *node)
+		}
+	}
+
+	return err
+}
+
+func (fa *FileAnalyzer) analyzeFiles(projectPath string, project *models.Project) error {
+	return filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || fa.shouldSkip(path, info) {
+			return err
+		}
+
+		ext := strings.ToLower(filepath.Ext(info.Name()))
+		if fa.isCodeFile(ext) {
+			relPath, _ := filepath.Rel(projectPath, path)
+			project.Files = append(project.Files, models.FileInfo{
+				Name:      info.Name(),
+				Path:      relPath,
+				Extension: ext,
+				Size:      info.Size(),
+				Language:  fa.getLanguage(ext),
+			})
+		}
+
+		return nil
+	})
+}
+
+func (fa *FileAnalyzer) shouldSkip(path string, info os.FileInfo) bool {
+	skipDirs := []string{"node_modules", "vendor", ".git", "dist", "build", "__pycache__"}
+	skipFiles := []string{".DS_Store", "Thumbs.db"}
+
+	name := info.Name()
+
+	if info.IsDir() {
+		for _, skipDir := range skipDirs {
+			if name == skipDir {
+				return true
+			}
+		}
+	} else {
+		for _, skipFile := range skipFiles {
+			if name == skipFile {
+				return true
+			}
+		}
+	}
+
+	return strings.HasPrefix(name, ".")
+}
+
+func (fa *FileAnalyzer) isCodeFile(ext string) bool {
+	codeExts := []string{
+		".js", ".ts", ".jsx", ".tsx", ".vue",
+		".php", ".py", ".go", ".java", ".c", ".cpp",
+		".html", ".css", ".scss", ".sass", ".less",
+		".json", ".xml", ".yaml", ".yml", ".md",
+	}
+
+	for _, codeExt := range codeExts {
+		if ext == codeExt {
+			return true
+		}
+	}
+	return false
+}
+
+func (fa *FileAnalyzer) getLanguage(ext string) string {
+	langMap := map[string]string{
+		".js":   "JavaScript",
+		".ts":   "TypeScript",
+		".jsx":  "React",
+		".tsx":  "React TypeScript",
+		".vue":  "Vue.js",
+		".php":  "PHP",
+		".py":   "Python",
+		".go":   "Go",
+		".java": "Java",
+		".html": "HTML",
+		".css":  "CSS",
+		".scss": "SCSS",
+		".json": "JSON",
+		".md":   "Markdown",
+	}
+
+	if lang, exists := langMap[ext]; exists {
+		return lang
+	}
+	return "Unknown"
+}

@@ -65,11 +65,11 @@
             showStatus('Uploading file...', 'processing');
             
             try {
-                const response = await fetch('/api/upload', {
+                const response = await fetch('http://localhost:3000/api/upload', {
                     method: 'POST',
                     body: formData
                 });
-                
+                alert(response);
                 const result = await response.json();
                 
                 if (response.ok) {
@@ -85,7 +85,7 @@
         
         async function pollStatus(jobId) {
             try {
-                const response = await fetch(`/api/status/${jobId}`);
+                const response = await fetch(`http://localhost:3000/api/status/${jobId}`);
                 const result = await response.json();
                 
                 if (result.status === 'completed') {

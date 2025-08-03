@@ -2,10 +2,33 @@ package models
 
 import "time"
 
+type APIEndpoint struct {
+	Method      string   `json:"method"`
+	Path        string   `json:"path"`
+	Middleware  []string `json:"middleware"`
+	Handler     string   `json:"handler"`
+	Description string   `json:"description"`
+	CurlExample string   `json:"curl_example"`
+}
+
 type Project struct {
-	Name         string                  `json:"name"`
-	Type         string                  `json:"type"`
-	Path         string                  `json:"path"`
+	Name              string            `json:"name"`
+	Type              string            `json:"type"`
+	Path              string            `json:"path"`
+	Overview          string            `json:"overview"`
+	TechStack         []string          `json:"tech_stack"`
+	Architecture      string            `json:"architecture"`
+	FolderStructure   map[string]string `json:"folder_structure"`
+	SetupInstructions []string          `json:"setup_instructions"`
+	APIEndpoints      []APIEndpoint     `json:"api_endpoints"`
+	ParsersInfo       map[string]string `json:"parsers_info"`
+	DataFlow          string            `json:"data_flow"`
+	ExternalServices  []string          `json:"external_services"`
+	DeploymentInfo    []string          `json:"deployment_info"`
+	FutureRoadmap     []string          `json:"future_roadmap"`
+	CommonIssues      []string          `json:"common_issues"`
+	DeveloperNotes    []string          `json:"developer_notes"`
+
 	Dependencies map[string][]Dependency `json:"dependencies"`
 	Files        []FileInfo              `json:"files"`
 	Structure    []DirectoryNode         `json:"structure"`

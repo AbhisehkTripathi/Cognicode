@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gomutex/godocx"
@@ -10,37 +12,52 @@ import (
 	"code-doc-tool/internal/models"
 )
 
+// saveDocxFile saves a godocx document to a specific path
+func saveDocxFile(doc *docx.RootDoc, outputPath string) error {
+	file, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return doc.Write(file)
+}
+
 type DocxGenerator struct{}
+
+func ensureDir(dir string) error {
+	if dir == "" {
+		return nil
+	}
+	return os.MkdirAll(dir, 0755)
+}
 
 func NewDocxGenerator() *DocxGenerator {
 	return &DocxGenerator{}
 }
 
 func (dg *DocxGenerator) GenerateDocumentation(project *models.Project, outputPath string) error {
+	// Ensure output directory exists
+	outputDir := filepath.Dir(outputPath)
+	if err := ensureDir(outputDir); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
 	// Create new document
 	doc, err := godocx.NewDocument()
 	if err != nil {
 		return fmt.Errorf("failed to create document: %w", err)
 	}
 
-	// Add title
+	// Add main title
 	titlePara := doc.AddParagraph("")
 	titlePara.AddText(fmt.Sprintf("%s - Code Documentation", project.Name))
+	titlePara.Style("Title")
 
-	// Add project overview
-	dg.addProjectOverview(doc, project)
+	// Add all custom sections in order
+	dg.addCustomSections(doc, project)
 
-	// Add dependencies section
-	dg.addDependencies(doc, project)
-
-	// Add directory structure
-	dg.addDirectoryStructure(doc, project)
-
-	// Add file analysis
-	dg.addFileAnalysis(doc, project)
-
-	// Save document
-	if err := doc.Save(); err != nil {
+	// Save document to outputPath
+	if err := saveDocxFile(doc, outputPath); err != nil {
 		return fmt.Errorf("failed to save document: %w", err)
 	}
 
@@ -175,5 +192,154 @@ func (dg *DocxGenerator) addDirectoryEntry(doc *docx.RootDoc, dir models.Directo
 	// Recursively add children
 	for _, child := range dir.Children {
 		dg.addDirectoryEntry(doc, child, level+1)
+	}
+}
+func (dg *DocxGenerator) addCustomSections(doc *docx.RootDoc, p *models.Project) {
+	// 1. Project Overview
+	doc.AddHeading("1. Project Overview", 1)
+	if p.Overview != "" {
+		doc.AddParagraph(p.Overview)
+	} else {
+		doc.AddParagraph("No overview available.")
+	}
+
+	// 2. Architecture Diagram
+	doc.AddHeading("2. Architecture Diagram", 1)
+	if p.Architecture != "" {
+		doc.AddParagraph(p.Architecture)
+		// Optionally: embed image if supported
+	} else {
+		doc.AddParagraph("No architecture diagram provided.")
+	}
+
+	// 3. Tech Stack Summary
+	doc.AddHeading("3. Tech Stack Summary", 1)
+	if len(p.TechStack) > 0 {
+		for _, tech := range p.TechStack {
+			doc.AddParagraph("• " + tech)
+		}
+	} else {
+		doc.AddParagraph("No tech stack information available.")
+	}
+
+	// 4. Folder Structure
+	doc.AddHeading("4. Folder Structure", 1)
+	if len(p.FolderStructure) > 0 {
+		table := doc.AddTable()
+		row := table.AddRow()
+		row.AddCell().AddParagraph("Folder")
+		row.AddCell().AddParagraph("Description")
+		for folder, desc := range p.FolderStructure {
+			row := table.AddRow()
+			row.AddCell().AddParagraph(folder)
+			row.AddCell().AddParagraph(desc)
+		}
+	} else {
+		doc.AddParagraph("No folder structure information available.")
+	}
+
+	// 5. Setup Instructions
+	doc.AddHeading("5. Setup Instructions", 1)
+	if len(p.SetupInstructions) > 0 {
+		for _, step := range p.SetupInstructions {
+			doc.AddParagraph("• " + step)
+		}
+	} else {
+		doc.AddParagraph("No setup instructions provided.")
+	}
+
+	// 6. API Reference
+	doc.AddHeading("6. API Reference", 1)
+	if len(p.APIEndpoints) > 0 {
+		table := doc.AddTable()
+		row := table.AddRow()
+		row.AddCell().AddParagraph("Method")
+		row.AddCell().AddParagraph("Path")
+		row.AddCell().AddParagraph("Description")
+		row.AddCell().AddParagraph("Example")
+		for _, ep := range p.APIEndpoints {
+			row := table.AddRow()
+			row.AddCell().AddParagraph(ep.Method)
+			row.AddCell().AddParagraph(ep.Path)
+			row.AddCell().AddParagraph(strings.Join(ep.Middleware, " → "))
+			row.AddCell().AddParagraph(ep.Handler)
+			row.AddCell().AddParagraph(ep.CurlExample)
+		}
+	} else {
+		doc.AddParagraph("No API reference available.")
+	}
+
+	// 7. Parsers Info
+	doc.AddHeading("7. Parsers Info", 1)
+	if len(p.ParsersInfo) > 0 {
+		table := doc.AddTable()
+		row := table.AddRow()
+		row.AddCell().AddParagraph("Language")
+		row.AddCell().AddParagraph("Parser Details")
+		for lang, desc := range p.ParsersInfo {
+			row := table.AddRow()
+			row.AddCell().AddParagraph(lang)
+			row.AddCell().AddParagraph(desc)
+		}
+	} else {
+		doc.AddParagraph("No parser information available.")
+	}
+
+	// 8. Data Flow
+	doc.AddHeading("8. Data Flow", 1)
+	if p.DataFlow != "" {
+		doc.AddParagraph(p.DataFlow)
+	} else {
+		doc.AddParagraph("No data flow information provided.")
+	}
+
+	// 9. External Services
+	doc.AddHeading("9. External Services", 1)
+	if len(p.ExternalServices) > 0 {
+		for _, svc := range p.ExternalServices {
+			doc.AddParagraph("• " + svc)
+		}
+	} else {
+		doc.AddParagraph("No external services listed.")
+	}
+
+	// 10. Deployment Info
+	doc.AddHeading("10. Deployment Info", 1)
+	if len(p.DeploymentInfo) > 0 {
+		for _, dep := range p.DeploymentInfo {
+			doc.AddParagraph(dep)
+		}
+	} else {
+		doc.AddParagraph("No deployment info provided.")
+	}
+
+	// 11. Future Roadmap
+	doc.AddHeading("11. Future Roadmap", 1)
+	if len(p.FutureRoadmap) > 0 {
+		for _, item := range p.FutureRoadmap {
+			doc.AddParagraph("• " + item)
+		}
+	} else {
+		doc.AddParagraph("No roadmap provided.")
+	}
+
+	// 12. Common Issues
+	doc.AddHeading("12. Common Issues", 1)
+	if len(p.CommonIssues) > 0 {
+		for _, issue := range p.CommonIssues {
+			doc.AddParagraph("• " + issue)
+		}
+	} else {
+		doc.AddParagraph("No common issues documented.")
+	}
+
+	// 13. Developer Notes
+	doc.AddHeading("13. Developer Notes", 1)
+	if len(p.DeveloperNotes) > 0 {
+		for _, note := range p.DeveloperNotes {
+			doc.AddParagraph(note)
+		}
+	} else {
+		doc.AddParagraph("No developer notes provided.")
 	}
 }
