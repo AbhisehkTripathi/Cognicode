@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -17,6 +18,26 @@ type UploadResponse struct {
 	JobID   string `json:"job_id"`
 	Message string `json:"message"`
 	Status  string `json:"status"`
+}
+
+func CollectSourceFiles(root string, exts []string) ([]string, error) {
+	var files []string
+	extMap := map[string]bool{}
+	for _, e := range exts {
+		extMap[strings.ToLower(e)] = true
+	}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			if extMap[strings.ToLower(filepath.Ext(path))] {
+				files = append(files, path)
+			}
+		}
+		return nil
+	})
+	return files, err
 }
 
 func UploadCodebase(c *fiber.Ctx) error {
@@ -61,7 +82,6 @@ func UploadCodebase(c *fiber.Ctx) error {
 		Status:  "processing",
 	})
 }
-
 func processCodebase(jobID, filePath, filename string) {
 	log.Printf("Starting processing for job %s", jobID)
 
@@ -70,11 +90,55 @@ func processCodebase(jobID, filePath, filename string) {
 		log.Printf("Failed to extract archive for job %s: %v", jobID, err)
 		return
 	}
-	log.Printf("Extraction complete for job %s", jobID)
+	log.Printf("Extraction complete for job %s", extractPath)
+
+	// Collect code files (.py, .js, .ts, .php, .go, ... add others as needed)
+	exts := []string{".py", ".js", ".ts", ".php", ".go"}
+	codeFiles, err := CollectSourceFiles(extractPath, exts)
+	if err != nil || len(codeFiles) == 0 {
+		log.Printf("No source files found for job %s: %v", jobID, err)
+		return
+	}
+
+	// Analyze files (could aggregate, or select main if preferred)
+	var docs []string
+	for _, codeFile := range codeFiles {
+		log.Printf("Analyzing file: %s", codeFile)
+		doc, err := services.AnalyzeProject(codeFile)
+		if err != nil {
+			log.Printf("File analysis failed for %s: %v", codeFile, err)
+			continue
+		}
+		docs = append(docs, doc)
+	}
+
+	// Combine all docs into one (simple join, or make a section per file)
+	combinedDoc := strings.Join(docs, "\n\n---\n\n")
+
+	// Generate documentation file (save as .docx, or markdown, as you wish)
+	generator := services.NewDocxGenerator()
+	outputPath := fmt.Sprintf("./output/%s_documentation.docx", jobID)
+	if err := generator.GenerateDocumentation(combinedDoc, outputPath); err != nil {
+		log.Printf("Failed to generate documentation for job %s: %v", jobID, err)
+		return
+	}
+	log.Printf("Documentation generated successfully for job %s", jobID)
+
+	utils.CleanupDir(fmt.Sprintf("./uploads/%s", jobID))
+}
+
+func processCodebaseOld(jobID, filePath, filename string) {
+	log.Printf("Starting processing for job %s", jobID)
+
+	extractPath := fmt.Sprintf("./uploads/%s/extracted", jobID)
+	if err := utils.ExtractArchive(filePath, extractPath); err != nil {
+		log.Printf("Failed to extract archive for job %s: %v", jobID, err)
+		return
+	}
+	log.Printf("Extraction complete for job %s", extractPath)
 
 	// Analyze codebase
-	analyzer := services.NewFileAnalyzer()
-	project, err := analyzer.AnalyzeProject(extractPath)
+	project, err := services.AnalyzeProject(extractPath)
 	if err != nil {
 		log.Printf("Failed to analyze project for job %s: %v", jobID, err)
 		return
