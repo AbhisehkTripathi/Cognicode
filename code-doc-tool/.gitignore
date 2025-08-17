@@ -1,0 +1,62 @@
+# ------------------------
+# Go Build Artifacts
+# ------------------------
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.log
+
+# Compiled binary
+/main
+*.bin
+
+# Go workspace files
+bin/
+pkg/
+vendor/
+
+# Dependency / module files
+go.sum
+go.work
+go.work.sum
+
+# ------------------------
+# Python / LangChain
+# ------------------------
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.cache
+*.egg-info/
+pip-wheel-metadata/
+*.pytest_cache/
+
+# ------------------------
+# IDE / Editor junk
+# ------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+
+# ------------------------
+# Temporary / Cache
+# ------------------------
+*.tmp
+*.bak
+
+# ------------------------
+# Output Docs
+# ------------------------
+*.docx
+/output/
