@@ -3,7 +3,7 @@
 
 Cognicode = Vision / Insight ✨
 
-**Cognicode** gives you instant insight into your codebase by auto-generating structured documentation using language-aware parsers — all from a simple folder upload.
+**Cognicode** gives you instant insight into your codebase by auto-generating structured documentation using language-aware parsers all from a simple folder upload.
 
 # 🚀 Cognicode – Instant Code Insight & Documentation Generator
 
